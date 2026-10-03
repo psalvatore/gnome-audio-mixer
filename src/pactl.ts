@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AudioSink } from "./types.js";
-import { isAudioSink } from "./validation.js";
+import type { AudioSink, PactlVolumeProp } from "./types.js";
+import { isPactlSink } from "./validation.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -14,7 +14,7 @@ export async function getSinks(): Promise<AudioSink[]> {
     throw new Error("Expected pactl to return an array.");
   }
 
-  if (!pactlSinks.every(isAudioSink)) {
+  if (!pactlSinks.every(isPactlSink)) {
     throw new Error("pactl returned an invalid sink.");
   }
 
@@ -25,6 +25,17 @@ export async function getSinks(): Promise<AudioSink[]> {
       description: sink.description,
       state: sink.state,
       mute: sink.mute,
+      volume: getMaxVolumeFromChannels(sink.volume),
     };
   });
+}
+
+function getMaxVolumeFromChannels(value: PactlVolumeProp): number {
+  const channelArray = Object.values(value);
+
+  const volumePercentArray = channelArray.map((channel) => {
+    return parseInt(channel.value_percent, 10);
+  });
+
+  return Math.max(...volumePercentArray);
 }
