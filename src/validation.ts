@@ -4,6 +4,7 @@ import type {
   PactlVolumeChannel,
   PactlVolumeProp,
 } from "./types.js";
+import { VOLUME_LIMIT } from "./config.js";
 
 export function isSinkState(state: unknown): state is SinkState {
   return state === "RUNNING" || state === "IDLE" || state === "SUSPENDED";
@@ -28,6 +29,10 @@ export function isPactlSink(value: unknown): value is PactlSink {
   }
 
   return false;
+}
+
+export function isValidVolume(volume: number): boolean {
+  return Number.isFinite(volume) && volume >= 0 && volume <= VOLUME_LIMIT;
 }
 
 function isPactlVolumeProp(value: unknown): value is PactlVolumeProp {

@@ -1,6 +1,7 @@
-import { getSinks } from "./pactl.js";
+import { getSinks, setSinkVolume } from "./pactl.js";
 
 try {
+  await setSinkVolume("music_bus", 100);
   const sinks = await getSinks();
   console.log(sinks);
 } catch (error) {
