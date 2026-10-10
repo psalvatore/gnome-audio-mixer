@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { AudioSink, PactlVolumeProp } from "./types.js";
-import { isPactlSink, isValidVolume } from "./validation.js";
+import { isPactlSink, isValidVolume, isValidSinkName } from "./validation.js";
 import { VOLUME_LIMIT } from "./config.js";
 
 const execFileAsync = promisify(execFile);
@@ -35,7 +35,7 @@ export async function setSinkVolume(
   name: string,
   volume: number,
 ): Promise<void> {
-  if (name.trim().length === 0) {
+  if (!isValidSinkName(name)) {
     throw new Error("Sink name cannot be empty.");
   }
 
@@ -44,6 +44,15 @@ export async function setSinkVolume(
   }
 
   await execFileAsync("pactl", ["set-sink-volume", name, `${volume}%`]);
+}
+
+export async function setSinkMute(name: string, muted: boolean): Promise<void> {
+  if (!isValidSinkName(name)) {
+    throw new Error("Sink name cannot be empty.");
+  }
+
+  const muteValue = muted ? "1" : "0";
+  await execFileAsync("pactl", ["set-sink-mute", name, muteValue]);
 }
 
 function getMaxVolumeFromChannels(value: PactlVolumeProp): number {

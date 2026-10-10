@@ -35,6 +35,10 @@ export function isValidVolume(volume: number): boolean {
   return Number.isFinite(volume) && volume >= 0 && volume <= VOLUME_LIMIT;
 }
 
+export function isValidSinkName(name: string): boolean {
+  return name.trim().length > 0;
+}
+
 function isPactlVolumeProp(value: unknown): value is PactlVolumeProp {
   if (typeof value === "object" && value !== null) {
     const valuesArray = Object.values(value);
