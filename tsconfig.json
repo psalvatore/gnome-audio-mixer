@@ -40,5 +40,6 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "noEmitOnError": true
-  }
+  },
+  "include": ["src/**/*.ts"]
 }

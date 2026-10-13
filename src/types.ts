@@ -1,3 +1,8 @@
+export type CommandRunner = (
+  command: string,
+  args: string[],
+) => Promise<string>;
+
 export type SinkState = "RUNNING" | "IDLE" | "SUSPENDED";
 
 export interface AudioSink {

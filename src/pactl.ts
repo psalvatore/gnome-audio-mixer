@@ -1,15 +1,23 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AudioSink, PactlVolumeProp } from "./types.js";
+import type { AudioSink, PactlVolumeProp, CommandRunner } from "./types.js";
 import { isPactlSink, isValidVolume, isValidSinkName } from "./validation.js";
 import { VOLUME_LIMIT } from "./config.js";
 
 const execFileAsync = promisify(execFile);
 
-export async function getSinks(): Promise<AudioSink[]> {
-  const result = await execFileAsync("pactl", ["-f", "json", "list", "sinks"]);
+const defaultRunner: CommandRunner = async (command, args) => {
+  const result = await execFileAsync(command, args);
 
-  const pactlSinks: unknown = JSON.parse(result.stdout);
+  return result.stdout;
+};
+
+export async function getSinks(
+  runner: CommandRunner = defaultRunner,
+): Promise<AudioSink[]> {
+  const result = await runner("pactl", ["-f", "json", "list", "sinks"]);
+
+  const pactlSinks: unknown = JSON.parse(result);
 
   if (!Array.isArray(pactlSinks)) {
     throw new Error("Expected pactl to return an array.");
@@ -34,6 +42,7 @@ export async function getSinks(): Promise<AudioSink[]> {
 export async function setSinkVolume(
   name: string,
   volume: number,
+  runner: CommandRunner = defaultRunner,
 ): Promise<void> {
   if (!isValidSinkName(name)) {
     throw new Error("Sink name cannot be empty.");
@@ -43,16 +52,20 @@ export async function setSinkVolume(
     throw new RangeError(`Volume must be between 0 and ${VOLUME_LIMIT}.`);
   }
 
-  await execFileAsync("pactl", ["set-sink-volume", name, `${volume}%`]);
+  await runner("pactl", ["set-sink-volume", name, `${volume}%`]);
 }
 
-export async function setSinkMute(name: string, muted: boolean): Promise<void> {
+export async function setSinkMute(
+  name: string,
+  muted: boolean,
+  runner: CommandRunner = defaultRunner,
+): Promise<void> {
   if (!isValidSinkName(name)) {
     throw new Error("Sink name cannot be empty.");
   }
 
   const muteValue = muted ? "1" : "0";
-  await execFileAsync("pactl", ["set-sink-mute", name, muteValue]);
+  await runner("pactl", ["set-sink-mute", name, muteValue]);
 }
 
 function getMaxVolumeFromChannels(value: PactlVolumeProp): number {
