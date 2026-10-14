@@ -1,9 +1,7 @@
-import { getSinks, setSinkVolume, setSinkMute } from "./pactl.js";
+import { displayMainMenu } from "./cli.js";
 
 try {
-  await setSinkMute("music_bus", true);
-  // await setSinkVolume("music_bus", 100);
-  console.log(await getSinks());
+  await displayMainMenu();
 } catch (error) {
   if (error instanceof Error) {
     console.log(error.message);
