@@ -2,56 +2,72 @@ import { createInterface } from "node:readline/promises";
 import type { Interface } from "node:readline/promises";
 import { getSinks, setSinkMute, setSinkVolume } from "./pactl.js";
 import { formatSinkList } from "./formatting.js";
-import { isValidSinkName, isValidVolume } from "./validation.js";
+import { isValidVolume } from "./validation.js";
 import { VOLUME_LIMIT } from "./config.js";
-import type { AudioSink } from "./types.js";
+import type { AudioSink, CliServices } from "./types.js";
 
-export async function displayMainMenu(): Promise<void> {
+const defaultServices: CliServices = {
+  getSinks,
+  setSinkVolume,
+  setSinkMute,
+};
+
+export async function startCli(): Promise<void> {
   const rl: Interface = createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
   try {
-    while (true) {
-      const answer = await rl.question(
-        "1. List audio sinks\n" +
-          "2. Set sink volume\n" +
-          "3. Mute/Unmute sink\n" +
-          "4. Exit\n\n" +
-          "Select an option: ",
-      );
-
-      try {
-        if (answer === "1") {
-          await listSinks();
-        } else if (answer === "2") {
-          await displaySetVolumeMenu(rl);
-        } else if (answer === "3") {
-          await displayMuteMenu(rl);
-        } else if (answer === "4") {
-          console.log("Goodbye!");
-          break;
-        } else {
-          console.log("Invalid selection.");
-        }
-      } catch (error) {
-        console.error(error instanceof Error ? error.message : "Unknown error");
-      }
-    }
+    await runMenu(rl);
   } finally {
     rl.close();
   }
 }
 
-async function listSinks(): Promise<void> {
-  const sinks = await getSinks();
+export async function runMenu(
+  rl: Interface,
+  services: CliServices = defaultServices,
+): Promise<void> {
+  while (true) {
+    const answer = await rl.question(
+      "1. List audio sinks\n" +
+        "2. Set sink volume\n" +
+        "3. Mute/Unmute sink\n" +
+        "4. Exit\n\n" +
+        "Select an option: ",
+    );
+
+    try {
+      if (answer === "1") {
+        await listSinks(services);
+      } else if (answer === "2") {
+        await runSetVolumeMenu(rl, services);
+      } else if (answer === "3") {
+        await runMuteMenu(rl, services);
+      } else if (answer === "4") {
+        console.log("Goodbye!");
+        break;
+      } else {
+        console.log("Invalid selection.");
+      }
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+}
+
+async function listSinks(services: CliServices): Promise<void> {
+  const sinks = await services.getSinks();
 
   console.log(formatSinkList(sinks) + "\n");
 }
 
-async function displaySetVolumeMenu(rl: Interface): Promise<void> {
-  const sink = await selectSink(rl);
+async function runSetVolumeMenu(
+  rl: Interface,
+  services: CliServices,
+): Promise<void> {
+  const sink = await selectSink(rl, services);
 
   if (!sink) {
     return;
@@ -69,13 +85,16 @@ async function displaySetVolumeMenu(rl: Interface): Promise<void> {
     return;
   }
 
-  await setSinkVolume(sink.name, parsedVolume);
+  await services.setSinkVolume(sink.name, parsedVolume);
 
   console.log(`Volume for ${sink.description} set to ${parsedVolume}%`);
 }
 
-async function displayMuteMenu(rl: Interface): Promise<void> {
-  const sink = await selectSink(rl);
+async function runMuteMenu(
+  rl: Interface,
+  services: CliServices,
+): Promise<void> {
+  const sink = await selectSink(rl, services);
 
   if (!sink) {
     return;
@@ -90,13 +109,16 @@ async function displayMuteMenu(rl: Interface): Promise<void> {
 
   const isMuted = muted === "1";
 
-  await setSinkMute(sink.name, isMuted);
+  await services.setSinkMute(sink.name, isMuted);
 
   console.log(`${sink.description} has been ${isMuted ? "muted" : "unmuted"}.`);
 }
 
-async function selectSink(rl: Interface): Promise<AudioSink | null> {
-  const sinks = await getSinks();
+async function selectSink(
+  rl: Interface,
+  services: CliServices,
+): Promise<AudioSink | null> {
+  const sinks = await services.getSinks();
 
   if (sinks.length === 0) {
     console.log("No audio sinks found.");

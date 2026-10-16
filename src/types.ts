@@ -32,3 +32,9 @@ export interface PactlVolumeChannel {
   value_percent: string;
   db: string;
 }
+
+export interface CliServices {
+  getSinks: () => Promise<AudioSink[]>;
+  setSinkVolume: (name: string, volume: number) => Promise<void>;
+  setSinkMute: (name: string, muted: boolean) => Promise<void>;
+}

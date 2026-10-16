@@ -1,11 +1,8 @@
-import { displayMainMenu } from "./cli.js";
+import { startCli } from "./cli.js";
 
 try {
-  await displayMainMenu();
+  await startCli();
 } catch (error) {
-  if (error instanceof Error) {
-    console.log(error.message);
-  } else {
-    console.log("Unknown error");
-  }
+  console.error(error);
+  process.exitCode = 1;
 }
