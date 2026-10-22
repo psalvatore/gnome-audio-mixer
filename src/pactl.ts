@@ -1,7 +1,18 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { AudioSink, PactlVolumeProp, CommandRunner } from "./types.js";
-import { isPactlSink, isValidVolume, isValidSinkName } from "./validation.js";
+import type {
+  AudioSink,
+  PactlVolumeProp,
+  CommandRunner,
+  AudioSinkInput,
+  PactlSinkInput,
+} from "./types.js";
+import {
+  isPactlSink,
+  isValidVolume,
+  isValidSinkName,
+  isPactlSinkInput,
+} from "./validation.js";
 import { VOLUME_LIMIT } from "./config.js";
 
 const execFileAsync = promisify(execFile);
@@ -76,4 +87,62 @@ function getMaxVolumeFromChannels(value: PactlVolumeProp): number {
   });
 
   return Math.max(...volumePercentArray);
+}
+
+export async function getSinkInputs(
+  runner: CommandRunner = defaultRunner,
+): Promise<AudioSinkInput[]> {
+  const result = await runner("pactl", ["-f", "json", "list", "sink-inputs"]);
+
+  const pactlSinkInputs: unknown = JSON.parse(result);
+
+  if (!Array.isArray(pactlSinkInputs)) {
+    throw new Error("Expected pactl to return an array.");
+  }
+
+  if (!pactlSinkInputs.every(isPactlSinkInput)) {
+    throw new Error("pactl returned an invalid sink input.");
+  }
+
+  return pactlSinkInputs.map((sinkInput) => {
+    return {
+      index: sinkInput.index,
+      sink: sinkInput.sink,
+      applicationName:
+        sinkInput.properties["application.name"] ?? "Unknown Application",
+      iconName: sinkInput.properties["application.icon_name"] ?? "",
+      mediaName: sinkInput.properties["media.name"] ?? "Unknown Stream",
+      mute: sinkInput.mute,
+      volume: getMaxVolumeFromChannels(sinkInput.volume),
+    };
+  });
+}
+
+export async function setSinkInputVolume(
+  index: number,
+  volume: number,
+  runner: CommandRunner = defaultRunner,
+): Promise<void> {
+  if (!Number.isInteger(index) || index < 0) {
+    throw new Error("Sink Input index must be a non-negative integer.");
+  }
+
+  if (!isValidVolume(volume)) {
+    throw new RangeError(`Volume must be between 0 and ${VOLUME_LIMIT}.`);
+  }
+
+  await runner("pactl", ["set-sink-input-volume", `${index}`, `${volume}%`]);
+}
+
+export async function setSinkInputMute(
+  index: number,
+  muted: boolean,
+  runner: CommandRunner = defaultRunner,
+): Promise<void> {
+  if (!Number.isInteger(index) || index < 0) {
+    throw new Error("Sink Input index must be a non-negative integer.");
+  }
+
+  const muteValue = muted ? "1" : "0";
+  await runner("pactl", ["set-sink-input-mute", `${index}`, muteValue]);
 }

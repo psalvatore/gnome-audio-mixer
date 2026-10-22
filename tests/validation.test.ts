@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isValidSinkName, isValidVolume } from "../src/validation.js";
+import {
+  isValidSinkName,
+  isValidVolume,
+  isPactlSinkInput,
+} from "../src/validation.js";
 import { VOLUME_LIMIT } from "../src/config.js";
+import { createFakePactlSinkInput } from "./helpers.js";
 
 const validVolumes = [0, 50, VOLUME_LIMIT];
 
@@ -38,3 +43,30 @@ for (const name of invalidSinkNames) {
     assert.equal(isValidSinkName(name), false);
   });
 }
+
+test("accepts valid PactlSinkInput", () => {
+  assert.equal(isPactlSinkInput(createFakePactlSinkInput()), true);
+});
+
+test("rejects invalid mute PactlSinkInput", () => {
+  const invalidInput = {
+    ...createFakePactlSinkInput(),
+    mute: "false",
+  };
+
+  assert.equal(isPactlSinkInput(invalidInput), false);
+});
+
+test("rejects invalid property PactlSinkInput", () => {
+  const input = createFakePactlSinkInput();
+
+  const invalidInput = {
+    ...input,
+    properties: {
+      ...input.properties,
+      "application.name": 12,
+    },
+  };
+
+  assert.equal(isPactlSinkInput(invalidInput), false);
+});

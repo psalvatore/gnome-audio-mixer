@@ -3,6 +3,7 @@ import type {
   PactlSink,
   PactlVolumeChannel,
   PactlVolumeProp,
+  PactlSinkInput,
 } from "./types.js";
 import { VOLUME_LIMIT } from "./config.js";
 
@@ -25,6 +26,30 @@ export function isPactlSink(value: unknown): value is PactlSink {
       typeof value.mute === "boolean" &&
       "volume" in value &&
       isPactlVolumeProp(value.volume)
+    );
+  }
+
+  return false;
+}
+
+export function isPactlSinkInput(value: unknown): value is PactlSinkInput {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return (
+      "index" in value &&
+      typeof value.index === "number" &&
+      "sink" in value &&
+      typeof value.sink === "number" &&
+      "mute" in value &&
+      typeof value.mute === "boolean" &&
+      "volume" in value &&
+      isPactlVolumeProp(value.volume) &&
+      "properties" in value &&
+      typeof value.properties === "object" &&
+      value.properties !== null &&
+      !Array.isArray(value.properties) &&
+      Object.values(value.properties).every(
+        (property) => typeof property === "string",
+      )
     );
   }
 

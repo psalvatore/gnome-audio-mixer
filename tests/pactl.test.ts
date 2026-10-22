@@ -1,8 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setSinkMute, setSinkVolume, getSinks } from "../src/pactl.js";
+import {
+  setSinkMute,
+  setSinkVolume,
+  getSinks,
+  getSinkInputs,
+  setSinkInputVolume,
+  setSinkInputMute,
+} from "../src/pactl.js";
 import { VOLUME_LIMIT } from "../src/config.js";
-import { createFakeRunner, createRecordingRunner } from "./helpers.js";
+import {
+  createFakePactlSinkInput,
+  createFakeRunner,
+  createRecordingRunner,
+} from "./helpers.js";
 
 test("mutes a sink using the correct pactl command", async () => {
   const commands: string[][] = [];
@@ -170,7 +181,7 @@ test("propagates errors from the pactl command runner (set volume)", async () =>
   );
 });
 
-test("returns an empty array when pactl reports no sinks", async () => {
+test("returns an empty array when pactl reports no sinks (get sinks)", async () => {
   const fakeRunner = createFakeRunner(JSON.stringify([]));
 
   const result = await getSinks(fakeRunner);
@@ -204,7 +215,7 @@ test("propagates errors from the pactl command runner (get sinks)", async () => 
   );
 });
 
-test("rejects invalid JSON returned by pactl", async () => {
+test("rejects invalid JSON returned by pactl (get sinks)", async () => {
   const fakeRunner = createFakeRunner("invalid json");
 
   await assert.rejects(async () => {
@@ -212,7 +223,7 @@ test("rejects invalid JSON returned by pactl", async () => {
   }, SyntaxError);
 });
 
-test("rejects valid JSON, but not an array returned by pactl", async () => {
+test("rejects valid JSON, but not an array returned by pactl (get sinks)", async () => {
   const fakeRunner = createFakeRunner(JSON.stringify({}));
 
   await assert.rejects(
@@ -226,7 +237,7 @@ test("rejects valid JSON, but not an array returned by pactl", async () => {
   );
 });
 
-test("rejects valid array containing an invalid sink returned by pactl", async () => {
+test("rejects valid array containing an invalid sink returned by pactl (get sinks)", async () => {
   const fakeRunner = createFakeRunner(JSON.stringify([{}]));
 
   await assert.rejects(
@@ -278,3 +289,179 @@ test("converts valid pactl sink data into AudioSink objects", async () => {
     },
   ]);
 });
+
+test("executes the correct pactl command to retrieve sink inputs", async () => {
+  const commands: string[][] = [];
+
+  const fakeRunner = createRecordingRunner(commands, "[]");
+
+  await getSinkInputs(fakeRunner);
+
+  assert.deepEqual(commands, [["pactl", "-f", "json", "list", "sink-inputs"]]);
+});
+
+test("rejects invalid JSON returned by pactl (get sink inputs)", async () => {
+  const fakeRunner = createFakeRunner("invalid json");
+
+  await assert.rejects(async () => {
+    await getSinkInputs(fakeRunner);
+  }, SyntaxError);
+});
+
+test("rejects valid JSON, but not an array returned by pactl (get sink inputs)", async () => {
+  const fakeRunner = createFakeRunner(JSON.stringify({}));
+
+  await assert.rejects(
+    async () => {
+      await getSinkInputs(fakeRunner);
+    },
+    {
+      name: "Error",
+      message: "Expected pactl to return an array.",
+    },
+  );
+});
+
+test("returns an empty array when no sink inputs exist", async () => {
+  const fakeRunner = createFakeRunner("[]");
+
+  const result = await getSinkInputs(fakeRunner);
+
+  assert.deepEqual(result, []);
+});
+
+test("converts valid pactl sink input data into AudioSinkInput objects", async () => {
+  const fakeRunner = createFakeRunner(
+    JSON.stringify([createFakePactlSinkInput()]),
+  );
+
+  const result = await getSinkInputs(fakeRunner);
+
+  assert.deepEqual(result, [
+    {
+      index: 0,
+      sink: 111,
+      applicationName: "Test Browser",
+      iconName: "test-browser",
+      mediaName: "Playback",
+      mute: false,
+      volume: 60,
+    },
+  ]);
+});
+
+test("rejects invalid pactl sink input", async () => {
+  const invalidInput = {
+    ...createFakePactlSinkInput(),
+    mute: "false",
+  };
+
+  const fakeRunner = createFakeRunner(JSON.stringify([invalidInput]));
+
+  await assert.rejects(
+    async () => {
+      await getSinkInputs(fakeRunner);
+    },
+    {
+      name: "Error",
+      message: "pactl returned an invalid sink input.",
+    },
+  );
+});
+
+test("executes the correct pactl command to set sink input volume", async () => {
+  const commands: string[][] = [];
+
+  const fakeRunner = createRecordingRunner(commands, "[]");
+
+  await setSinkInputVolume(13150, 50, fakeRunner);
+
+  assert.deepEqual(commands, [
+    ["pactl", "set-sink-input-volume", "13150", "50%"],
+  ]);
+});
+
+const invalidVolumes = [-1, VOLUME_LIMIT + 1];
+
+for (const volume of invalidVolumes) {
+  test(`rejects invalid volume of ${volume} (set sink input volume)`, async () => {
+    const commands: string[][] = [];
+
+    const fakeRunner = createRecordingRunner(commands, "[]");
+
+    await assert.rejects(
+      async () => {
+        await setSinkInputVolume(13150, volume, fakeRunner);
+      },
+      {
+        name: "RangeError",
+        message: `Volume must be between 0 and ${VOLUME_LIMIT}.`,
+      },
+    );
+
+    assert.deepEqual(commands, []);
+  });
+}
+
+const invalidVolumeIndexes = [-1, 1.5];
+
+for (const index of invalidVolumeIndexes) {
+  test(`rejects invalid index of ${index} (set sink input volume)`, async () => {
+    const commands: string[][] = [];
+
+    const fakeRunner = createRecordingRunner(commands, "[]");
+
+    await assert.rejects(
+      async () => {
+        await setSinkInputVolume(index, 50, fakeRunner);
+      },
+      {
+        name: "Error",
+        message: "Sink Input index must be a non-negative integer.",
+      },
+    );
+
+    assert.deepEqual(commands, []);
+  });
+}
+
+const muteCases = [
+  { muted: true, expected: "1" },
+  { muted: false, expected: "0" },
+];
+
+for (const { muted, expected } of muteCases) {
+  test(`executes the correct pactl command to set sink input mute (${muted})`, async () => {
+    const commands: string[][] = [];
+
+    const fakeRunner = createRecordingRunner(commands, "[]");
+
+    await setSinkInputMute(13150, muted, fakeRunner);
+
+    assert.deepEqual(commands, [
+      ["pactl", "set-sink-input-mute", "13150", expected],
+    ]);
+  });
+}
+
+const invalidMuteIndexes = [-1, 1.5];
+
+for (const index of invalidMuteIndexes) {
+  test(`rejects invalid index of ${index} (set sink input mute)`, async () => {
+    const commands: string[][] = [];
+
+    const fakeRunner = createRecordingRunner(commands, "[]");
+
+    await assert.rejects(
+      async () => {
+        await setSinkInputMute(index, true, fakeRunner);
+      },
+      {
+        name: "Error",
+        message: "Sink Input index must be a non-negative integer.",
+      },
+    );
+
+    assert.deepEqual(commands, []);
+  });
+}

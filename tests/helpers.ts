@@ -1,5 +1,10 @@
 import type { Interface } from "node:readline/promises";
-import type { CommandRunner, AudioSink } from "../src/types.js";
+import type {
+  CommandRunner,
+  AudioSink,
+  PactlSinkInput,
+  AudioSinkInput,
+} from "../src/types.js";
 
 export function createFakeRunner(output: string): CommandRunner {
   return async (): Promise<string> => {
@@ -49,5 +54,42 @@ export function createFakeSink(): AudioSink {
     state: "RUNNING",
     mute: false,
     volume: 50,
+  };
+}
+
+export function createFakePactlSinkInput(): PactlSinkInput {
+  return {
+    index: 0,
+    sink: 111,
+    mute: false,
+    volume: {
+      "front-left": {
+        value: 65536,
+        value_percent: "40%",
+        db: "0.00 dB",
+      },
+      "front-right": {
+        value: 65536,
+        value_percent: "60%",
+        db: "0.00 dB",
+      },
+    },
+    properties: {
+      "application.name": "Test Browser",
+      "application.icon_name": "test-browser",
+      "media.name": "Playback",
+    },
+  };
+}
+
+export function createFakeSinkInput(): AudioSinkInput {
+  return {
+    index: 0,
+    sink: 111,
+    applicationName: "Test Browser",
+    iconName: "test-browser",
+    mediaName: "Playback",
+    mute: false,
+    volume: 40,
   };
 }
