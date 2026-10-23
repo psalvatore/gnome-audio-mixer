@@ -64,6 +64,27 @@ export function isValidSinkName(name: string): boolean {
   return name.trim().length > 0;
 }
 
+export function isValidMenuSelection(
+  selection: string,
+  itemCount: number,
+): boolean {
+  const parsedSelection = Number(selection);
+
+  return (
+    /^\d+$/.test(selection) &&
+    parsedSelection >= 1 &&
+    parsedSelection <= itemCount
+  );
+}
+
+export function getSelectedItem<T>(items: T[], selection: string): T | null {
+  if (!isValidMenuSelection(selection, items.length)) {
+    return null;
+  }
+
+  return items[Number(selection) - 1] ?? null;
+}
+
 function isPactlVolumeProp(value: unknown): value is PactlVolumeProp {
   if (typeof value === "object" && value !== null) {
     const valuesArray = Object.values(value);

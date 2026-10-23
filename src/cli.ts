@@ -9,7 +9,11 @@ import {
   setSinkInputMute,
 } from "./pactl.js";
 import { formatSinkList, formatSinkInputList } from "./formatting.js";
-import { isValidVolume } from "./validation.js";
+import {
+  isValidVolume,
+  isValidMenuSelection,
+  getSelectedItem,
+} from "./validation.js";
 import { VOLUME_LIMIT, EXIT_OPTION } from "./config.js";
 import type { AudioSink, AudioSinkInput, CliServices } from "./types.js";
 
@@ -148,19 +152,14 @@ async function selectSink(
   console.log(formatSinkList(sinks) + "\n");
 
   const selection = await rl.question("Select sink: ");
-  const parsedSelection = Number(selection);
+  const sink = getSelectedItem(sinks, selection);
 
-  if (
-    selection.trim() === "" ||
-    !Number.isInteger(parsedSelection) ||
-    parsedSelection < 1 ||
-    parsedSelection > sinks.length
-  ) {
+  if (sink === null) {
     console.log("Invalid sink selection.");
     return null;
   }
 
-  return sinks[parsedSelection - 1] ?? null;
+  return sink;
 }
 
 async function listSinkInputs(services: CliServices): Promise<void> {
@@ -239,17 +238,12 @@ async function selectSinkInput(
   console.log(formatSinkInputList(sinkInputs) + "\n");
 
   const selection = await rl.question("Select application audio stream: ");
-  const parsedSelection = Number(selection);
+  const sinkInput = getSelectedItem(sinkInputs, selection);
 
-  if (
-    selection.trim() === "" ||
-    !Number.isInteger(parsedSelection) ||
-    parsedSelection < 1 ||
-    parsedSelection > sinkInputs.length
-  ) {
+  if (sinkInput === null) {
     console.log("Invalid application audio stream selection.");
     return null;
   }
 
-  return sinkInputs[parsedSelection - 1] ?? null;
+  return sinkInput;
 }
