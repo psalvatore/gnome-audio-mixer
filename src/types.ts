@@ -5,6 +5,16 @@ export type CommandRunner = (
 
 export type SinkState = "RUNNING" | "IDLE" | "SUSPENDED";
 
+export type AudioEventAction = "new" | "change" | "remove";
+
+export type AudioEventResource = "sink" | "sink-input";
+
+export interface AudioEvent {
+  action: AudioEventAction;
+  resource: AudioEventResource;
+  index: number;
+}
+
 export interface AudioSink {
   index: number;
   name: string;

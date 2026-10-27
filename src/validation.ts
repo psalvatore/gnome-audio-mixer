@@ -4,6 +4,8 @@ import type {
   PactlVolumeChannel,
   PactlVolumeProp,
   PactlSinkInput,
+  AudioEventAction,
+  AudioEventResource,
 } from "./types.js";
 import { VOLUME_LIMIT } from "./config.js";
 
@@ -83,6 +85,18 @@ export function getSelectedItem<T>(items: T[], selection: string): T | null {
   }
 
   return items[Number(selection) - 1] ?? null;
+}
+
+export function isValidAudioEventAction(
+  value: string | undefined,
+): value is AudioEventAction {
+  return value === "new" || value === "change" || value === "remove";
+}
+
+export function isValidAudioEventResource(
+  value: string | undefined,
+): value is AudioEventResource {
+  return value === "sink" || value === "sink-input";
 }
 
 function isPactlVolumeProp(value: unknown): value is PactlVolumeProp {
