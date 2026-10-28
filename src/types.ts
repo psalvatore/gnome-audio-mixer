@@ -69,3 +69,20 @@ export interface CliServices {
   setSinkInputVolume: (index: number, volume: number) => Promise<void>;
   setSinkInputMute: (index: number, muted: boolean) => Promise<void>;
 }
+
+export interface AudioState {
+  sinks: AudioSink[];
+  sinkInputs: AudioSinkInput[];
+}
+
+export interface SinkChanges {
+  added: AudioSink[];
+  removed: AudioSink[];
+  updated: AudioSink[];
+}
+
+export interface SinkInputChanges {
+  added: AudioSinkInput[];
+  removed: AudioSinkInput[];
+  updated: AudioSinkInput[];
+}
