@@ -86,3 +86,8 @@ export interface SinkInputChanges {
   removed: AudioSinkInput[];
   updated: AudioSinkInput[];
 }
+
+export interface AudioStateChanges {
+  sinks: SinkChanges;
+  sinkInputs: SinkInputChanges;
+}
