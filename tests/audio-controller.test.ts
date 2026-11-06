@@ -3,6 +3,40 @@ import test from "node:test";
 import { createAudioController } from "../src/audio-controller.js";
 import { createFakeSink } from "./helpers.js";
 
+function createTestController() {
+  const calls: string[] = [];
+
+  const fakeSubscribe = (_onAudioChange: () => void) => () => {};
+
+  const fakeFetchState = async () => ({
+    sinks: [],
+    sinkInputs: [],
+  });
+
+  const fakeControls = {
+    setSinkVolume: async (name: string, volume: number) => {
+      calls.push(`volume:${name}:${volume}`);
+    },
+    setSinkMute: async (name: string, muted: boolean) => {
+      calls.push(`mute:${name}:${muted}`);
+    },
+    setSinkInputVolume: async (index: number, volume: number) => {
+      calls.push(`input-volume:${index}:${volume}`);
+    },
+    setSinkInputMute: async (index: number, muted: boolean) => {
+      calls.push(`input-mute:${index}:${muted}`);
+    },
+  };
+
+  const controller = createAudioController(
+    fakeSubscribe,
+    fakeFetchState,
+    fakeControls,
+  );
+
+  return { controller, calls };
+}
+
 test("start() does not create duplicate subscriptions", () => {
   let subscriptionCount = 0;
 
@@ -103,4 +137,77 @@ test("refresh() updates the audio state store", { timeout: 2000 }, async () => {
   unsubscribe();
 
   assert.deepEqual(controller.store.getState().sinks, [fakeSink]);
+});
+
+test("setSinkVolume() delegates to audio controls", async () => {
+  const { controller, calls } = createTestController();
+
+  await controller.setSinkVolume("alsa_output.test", 75);
+
+  assert.deepEqual(calls, ["volume:alsa_output.test:75"]);
+});
+
+test("setSinkMute() delegates to audio controls", async () => {
+  const { controller, calls } = createTestController();
+
+  await controller.setSinkMute("alsa_output.test", true);
+
+  assert.deepEqual(calls, ["mute:alsa_output.test:true"]);
+});
+
+test("setSinkInputVolume() delegates to audio controls", async () => {
+  const { controller, calls } = createTestController();
+
+  await controller.setSinkInputVolume(42, 60);
+
+  assert.deepEqual(calls, ["input-volume:42:60"]);
+});
+
+test("setSinkInputMute() delegates to audio controls", async () => {
+  const { controller, calls } = createTestController();
+
+  await controller.setSinkInputMute(42, false);
+
+  assert.deepEqual(calls, ["input-mute:42:false"]);
+});
+
+test("controller propagates audio control errors", async () => {
+  const fakeSink = createFakeSink();
+
+  const fakeSubscribe = (_onAudioChange: () => void) => {
+    return () => {};
+  };
+
+  const fakeFetchAudioState = async () => ({
+    sinks: [fakeSink],
+    sinkInputs: [],
+  });
+
+  const calls: string[] = [];
+
+  const fakeControls = {
+    setSinkVolume: async () => {
+      throw new Error("pactl failed");
+    },
+    setSinkMute: async (name: string, muted: boolean) => {
+      calls.push(`mute:${name}:${muted}`);
+    },
+    setSinkInputVolume: async (index: number, volume: number) => {
+      calls.push(`input-volume:${index}:${volume}`);
+    },
+    setSinkInputMute: async (index: number, muted: boolean) => {
+      calls.push(`input-mute:${index}:${muted}`);
+    },
+  };
+
+  const controller = createAudioController(
+    fakeSubscribe,
+    fakeFetchAudioState,
+    fakeControls,
+  );
+
+  await assert.rejects(
+    controller.setSinkVolume("alsa_output.test", 75),
+    /pactl failed/,
+  );
 });
