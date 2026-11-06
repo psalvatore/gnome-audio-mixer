@@ -112,7 +112,7 @@ test("cancel when no debounce callback is pending", (t) => {
     callCount++;
   }, 200);
 
-  debounced();
+  debounced.cancel();
   debounced.cancel();
 
   t.mock.timers.tick(200);
