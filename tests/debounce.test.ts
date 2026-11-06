@@ -1,4 +1,4 @@
-import test from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { debounce } from "../src/debounce.js";
 
@@ -81,4 +81,64 @@ test("executes different debounce callbacks independently", (t) => {
 
   assert.equal(callCountA, 1);
   assert.equal(callCountB, 1);
+});
+
+test("cancel a pending debounce callback", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+
+  let callCount = 0;
+
+  const debounced = debounce(() => {
+    callCount++;
+  }, 200);
+
+  debounced();
+
+  t.mock.timers.tick(100);
+
+  debounced.cancel();
+
+  t.mock.timers.tick(200);
+
+  assert.equal(callCount, 0);
+});
+
+test("cancel when no debounce callback is pending", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+
+  let callCount = 0;
+
+  const debounced = debounce(() => {
+    callCount++;
+  }, 200);
+
+  debounced();
+  debounced.cancel();
+
+  t.mock.timers.tick(200);
+
+  assert.equal(callCount, 0);
+});
+
+test("schedule again after debounce callback cancelation", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+
+  let callCount = 0;
+
+  const debounced = debounce(() => {
+    callCount++;
+  }, 200);
+
+  debounced();
+  debounced.cancel();
+
+  t.mock.timers.tick(200);
+
+  assert.equal(callCount, 0);
+
+  debounced();
+
+  t.mock.timers.tick(200);
+
+  assert.equal(callCount, 1);
 });

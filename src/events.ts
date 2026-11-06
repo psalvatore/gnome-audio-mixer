@@ -3,7 +3,7 @@ import { LineBuffer } from "./line-buffer.js";
 import { parseAudioEvent } from "./audio-events.js";
 import { debounce } from "./debounce.js";
 
-export function subscribeToAudioEvents(onAudioChange: () => void): void {
+export function subscribeToAudioEvents(onAudioChange: () => void): () => void {
   const child = spawn("pactl", ["subscribe"]);
   const parser = new LineBuffer();
   const debouncedOnAudioChange = debounce(onAudioChange, 200);
@@ -21,4 +21,9 @@ export function subscribeToAudioEvents(onAudioChange: () => void): void {
   child.on("error", (error) => {
     console.error("Failed to start pactl:", error.message);
   });
+
+  return () => {
+    debouncedOnAudioChange.cancel();
+    child.kill();
+  };
 }

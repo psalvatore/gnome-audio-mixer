@@ -1,11 +1,30 @@
-export function debounce(callback: () => void, delay: number): () => void {
+type DebouncedFunction = (() => void) & {
+  cancel: () => void;
+};
+
+export function debounce(
+  callback: () => void,
+  delay: number,
+): DebouncedFunction {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  return () => {
+  const debounced = () => {
     if (timer !== undefined) {
       clearTimeout(timer);
     }
 
-    timer = setTimeout(callback, delay);
+    timer = setTimeout(() => {
+      timer = undefined;
+      callback();
+    }, delay);
   };
+
+  debounced.cancel = () => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  };
+
+  return debounced;
 }
