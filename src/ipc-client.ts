@@ -22,3 +22,7 @@ child.stdout.on("data", (chunk: Buffer) => {
 process.on("SIGINT", () => {
   child.kill("SIGINT");
 });
+
+child.on("exit", (code, signal) => {
+  console.error(`Audio backend exited (code: ${code}, signal: ${signal})`);
+});
