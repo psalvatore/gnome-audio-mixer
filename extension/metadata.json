@@ -1,0 +1,6 @@
+{
+  "uuid": "gnome-audio-mixer@psalvatore",
+  "name": "GNOME Audio Mixer",
+  "description": "Audio mixer for GNOME Shell",
+  "shell-version": ["50"]
+}

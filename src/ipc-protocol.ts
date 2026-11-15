@@ -1,9 +1,5 @@
-import type { AudioState } from "./types.js";
-
-export type AudioMessage = {
-  type: "state";
-  payload: AudioState;
-};
+import type { AudioMessage, AudioState } from "./types.js";
+import { isValidAudioMessage } from "./validation.js";
 
 export function serializeAudioMessage(message: AudioMessage): string {
   return JSON.stringify(message) + "\n";
@@ -18,30 +14,7 @@ export function parseAudioMessage(input: string): AudioMessage | null {
     return null;
   }
 
-  if (typeof parsed !== "object" || parsed === null) {
-    return null;
-  }
-
-  if (!("type" in parsed) || parsed.type !== "state") {
-    return null;
-  }
-
-  if (
-    !("payload" in parsed) ||
-    typeof parsed.payload !== "object" ||
-    parsed.payload === null
-  ) {
-    return null;
-  }
-
-  if (!("sinks" in parsed.payload) || !Array.isArray(parsed.payload.sinks)) {
-    return null;
-  }
-
-  if (
-    !("sinkInputs" in parsed.payload) ||
-    !Array.isArray(parsed.payload.sinkInputs)
-  ) {
+  if (!isValidAudioMessage(parsed)) {
     return null;
   }
 

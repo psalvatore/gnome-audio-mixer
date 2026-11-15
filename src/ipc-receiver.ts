@@ -1,5 +1,6 @@
-import { parseAudioMessage, type AudioMessage } from "./ipc-protocol.js";
+import { parseAudioMessage } from "./ipc-protocol.js";
 import { LineBuffer } from "./line-buffer.js";
+import type { AudioMessage } from "./types.js";
 
 export function createIpcReceiver(
   onMessage: (message: AudioMessage) => void,

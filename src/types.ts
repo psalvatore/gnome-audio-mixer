@@ -70,6 +70,11 @@ export interface CliServices {
   setSinkInputMute: (index: number, muted: boolean) => Promise<void>;
 }
 
+export type AudioMessage = {
+  type: "state";
+  payload: AudioState;
+};
+
 export interface AudioState {
   sinks: AudioSink[];
   sinkInputs: AudioSinkInput[];

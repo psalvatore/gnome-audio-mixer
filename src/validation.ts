@@ -6,11 +6,35 @@ import type {
   PactlSinkInput,
   AudioEventAction,
   AudioEventResource,
+  AudioMessage,
+  AudioSink,
+  AudioSinkInput,
 } from "./types.js";
 import { VOLUME_LIMIT } from "./config.js";
 
 export function isSinkState(state: unknown): state is SinkState {
   return state === "RUNNING" || state === "IDLE" || state === "SUSPENDED";
+}
+
+export function isAudioSink(value: unknown): value is AudioSink {
+  if (typeof value === "object" && value !== null) {
+    return (
+      "index" in value &&
+      typeof value.index === "number" &&
+      "name" in value &&
+      typeof value.name === "string" &&
+      "description" in value &&
+      typeof value.description === "string" &&
+      "state" in value &&
+      isSinkState(value.state) &&
+      "mute" in value &&
+      typeof value.mute === "boolean" &&
+      "volume" in value &&
+      typeof value.volume === "number"
+    );
+  }
+
+  return false;
 }
 
 export function isPactlSink(value: unknown): value is PactlSink {
@@ -28,6 +52,29 @@ export function isPactlSink(value: unknown): value is PactlSink {
       typeof value.mute === "boolean" &&
       "volume" in value &&
       isPactlVolumeProp(value.volume)
+    );
+  }
+
+  return false;
+}
+
+export function isAudioSinkInput(value: unknown): value is AudioSinkInput {
+  if (typeof value === "object" && value !== null) {
+    return (
+      "index" in value &&
+      typeof value.index === "number" &&
+      "sink" in value &&
+      typeof value.sink === "number" &&
+      "applicationName" in value &&
+      typeof value.applicationName === "string" &&
+      "iconName" in value &&
+      typeof value.iconName === "string" &&
+      "mediaName" in value &&
+      typeof value.mediaName === "string" &&
+      "mute" in value &&
+      typeof value.mute === "boolean" &&
+      "volume" in value &&
+      typeof value.volume === "number"
     );
   }
 
@@ -97,6 +144,26 @@ export function isValidAudioEventResource(
   value: string | undefined,
 ): value is AudioEventResource {
   return value === "sink" || value === "sink-input";
+}
+
+export function isValidAudioMessage(value: unknown): value is AudioMessage {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return (
+      "type" in value &&
+      value.type === "state" &&
+      "payload" in value &&
+      typeof value.payload === "object" &&
+      value.payload !== null &&
+      "sinks" in value.payload &&
+      Array.isArray(value.payload.sinks) &&
+      value.payload.sinks.every(isAudioSink) &&
+      "sinkInputs" in value.payload &&
+      Array.isArray(value.payload.sinkInputs) &&
+      value.payload.sinkInputs.every(isAudioSinkInput)
+    );
+  }
+
+  return false;
 }
 
 function isPactlVolumeProp(value: unknown): value is PactlVolumeProp {

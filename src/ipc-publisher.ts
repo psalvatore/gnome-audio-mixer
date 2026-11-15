@@ -1,5 +1,6 @@
 import type { AudioController } from "./audio-controller.js";
-import { serializeAudioMessage, type AudioMessage } from "./ipc-protocol.js";
+import { serializeAudioMessage } from "./ipc-protocol.js";
+import type { AudioMessage } from "./types.js";
 
 export function createIpcPublisher(
   controller: AudioController,
