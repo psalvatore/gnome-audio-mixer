@@ -124,25 +124,53 @@ export default class extends Extension {
 
     menu.removeAll();
 
+    const sectionHeader1 = new PopupMenu.PopupSeparatorMenuItem(
+      "Output Devices",
+    );
+
+    menu.addMenuItem(sectionHeader1);
+
     if (state.sinks.length === 0) {
       const menuItem = new PopupMenu.PopupMenuItem("No output devices found");
 
       menuItem.sensitive = false;
       menu.addMenuItem(menuItem);
-
-      return;
     }
-
-    const sectionHeader = new PopupMenu.PopupSeparatorMenuItem(
-      "Output Devices",
-    );
-
-    menu.addMenuItem(sectionHeader);
 
     for (const sink of state.sinks) {
       const menuItem = new PopupMenu.PopupMenuItem(sink.description);
       const volumeLabel = new St.Label({
         text: `${sink.volume}%`,
+        y_align: Clutter.ActorAlign.CENTER,
+      });
+
+      menuItem.add_child(volumeLabel);
+      menuItem.label.x_expand = true;
+      menu.addMenuItem(menuItem);
+    }
+
+    const sectionHeader2 = new PopupMenu.PopupSeparatorMenuItem("Applications");
+
+    menu.addMenuItem(sectionHeader2);
+
+    if (state.sinkInputs.length === 0) {
+      const menuItem = new PopupMenu.PopupMenuItem(
+        "No active application streams",
+      );
+
+      menuItem.sensitive = false;
+      menu.addMenuItem(menuItem);
+    }
+
+    for (const sinkInput of state.sinkInputs) {
+      const name =
+        !sinkInput.applicationName.trim() ||
+        sinkInput.applicationName === "Unknown Application"
+          ? sinkInput.mediaName || "Unknown Application"
+          : sinkInput.applicationName;
+      const menuItem = new PopupMenu.PopupMenuItem(name);
+      const volumeLabel = new St.Label({
+        text: `${sinkInput.volume}%`,
         y_align: Clutter.ActorAlign.CENTER,
       });
 
