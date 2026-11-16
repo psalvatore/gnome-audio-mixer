@@ -4,6 +4,7 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import St from "gi://St";
 import Gio from "gi://Gio";
+import Clutter from "gi://Clutter";
 import type { AudioMessage, AudioState } from "../src/types.js";
 import { isValidAudioMessage } from "../src/validation.js";
 
@@ -18,14 +19,6 @@ export default class extends Extension {
 
     const icon = new St.Icon({ icon_name: "audio-volume-high-symbolic" });
     this._indicator.add_child(icon);
-
-    const menu = this._indicator.menu;
-
-    if (!(menu instanceof PopupMenu.PopupMenu)) {
-      throw new Error("Expected a real popup menu");
-    }
-
-    this._buildMenu(menu);
 
     Main.panel.addToStatusArea(this.uuid, this._indicator);
 
@@ -108,31 +101,12 @@ export default class extends Extension {
     });
   }
 
-  private _buildMenu(menu: PopupMenu.PopupMenu): void {
-    const sectionHeader1 = new PopupMenu.PopupSeparatorMenuItem(
-      "Output Devices",
-    );
-    const menuItem1 = new PopupMenu.PopupMenuItem("Speakers");
-    const menuItem2 = new PopupMenu.PopupMenuItem("Headphones");
-
-    const sectionHeader2 = new PopupMenu.PopupSeparatorMenuItem("Applications");
-
-    const menuItem3 = new PopupMenu.PopupMenuItem("Brave");
-    const menuItem4 = new PopupMenu.PopupMenuItem("Discord");
-
-    menu.addMenuItem(sectionHeader1);
-    menu.addMenuItem(menuItem1);
-    menu.addMenuItem(menuItem2);
-    menu.addMenuItem(sectionHeader2);
-    menu.addMenuItem(menuItem3);
-    menu.addMenuItem(menuItem4);
-  }
-
   private _handleMessage(message: unknown): void {
     if (isValidAudioMessage(message)) {
       switch (message.type) {
         case "state":
           this._state = message.payload;
+          this._renderMenu(this._state);
           console.log("Audio IPC state updated:", JSON.stringify(message));
           break;
         default:
@@ -140,6 +114,41 @@ export default class extends Extension {
       }
     } else {
       console.log("Audio IPC expected audio message.");
+    }
+  }
+
+  private _renderMenu(state: AudioState): void {
+    if (!this._indicator) return;
+
+    const menu = this._indicator.menu as PopupMenu.PopupMenu;
+
+    menu.removeAll();
+
+    if (state.sinks.length === 0) {
+      const menuItem = new PopupMenu.PopupMenuItem("No output devices found");
+
+      menuItem.sensitive = false;
+      menu.addMenuItem(menuItem);
+
+      return;
+    }
+
+    const sectionHeader = new PopupMenu.PopupSeparatorMenuItem(
+      "Output Devices",
+    );
+
+    menu.addMenuItem(sectionHeader);
+
+    for (const sink of state.sinks) {
+      const menuItem = new PopupMenu.PopupMenuItem(sink.description);
+      const volumeLabel = new St.Label({
+        text: `${sink.volume}%`,
+        y_align: Clutter.ActorAlign.CENTER,
+      });
+
+      menuItem.add_child(volumeLabel);
+      menuItem.label.x_expand = true;
+      menu.addMenuItem(menuItem);
     }
   }
 }
