@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug IPC Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/ipc-server.js",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "/home/pat/.nvm/versions/node/v24.21.0/bin/node",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"],
+      "preLaunchTask": "npm: build"
+    }
+  ]
+}
