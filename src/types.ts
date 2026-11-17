@@ -96,3 +96,9 @@ export interface AudioStateChanges {
   sinks: SinkChanges;
   sinkInputs: SinkInputChanges;
 }
+
+export type AudioCommand = {
+  type: "set-sink-volume";
+  sinkIndex: number;
+  volume: number;
+};

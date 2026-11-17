@@ -9,6 +9,7 @@ import type {
   AudioMessage,
   AudioSink,
   AudioSinkInput,
+  AudioCommand,
 } from "./types.js";
 import { VOLUME_LIMIT } from "./config.js";
 
@@ -160,6 +161,21 @@ export function isValidAudioMessage(value: unknown): value is AudioMessage {
       "sinkInputs" in value.payload &&
       Array.isArray(value.payload.sinkInputs) &&
       value.payload.sinkInputs.every(isAudioSinkInput)
+    );
+  }
+
+  return false;
+}
+
+export function isValidAudioCommand(value: unknown): value is AudioCommand {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return (
+      "type" in value &&
+      value.type === "set-sink-volume" &&
+      "sinkIndex" in value &&
+      typeof value.sinkIndex === "number" &&
+      "volume" in value &&
+      typeof value.volume === "number"
     );
   }
 
