@@ -12,6 +12,17 @@
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "preLaunchTask": "npm: build"
+    },
+    {
+      "name": "Attach to GNOME Audio Backend",
+      "type": "node",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9229,
+      "restart": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

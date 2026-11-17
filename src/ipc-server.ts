@@ -13,11 +13,16 @@ const receive = createIpcCommandReceiver((command) => {
   console.error("Command recieved: ", command);
 });
 
-process.stdin.on("data", (chunk: Buffer) => {
+function handleStdinData(chunk: Buffer): void {
   receive(chunk.toString("utf8"));
-});
+}
+
+process.stdin.on("data", handleStdinData);
 
 process.on("SIGINT", () => {
   stopPublishing();
   controller.stop();
+
+  process.stdin.off("data", handleStdinData);
+  process.stdin.pause();
 });
