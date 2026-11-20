@@ -46,7 +46,7 @@ test("rejects an empty sink name without executing pactl", async () => {
     },
     {
       name: "Error",
-      message: "Sink name cannot be empty.",
+      message: "Sink id cannot be empty.",
     },
   );
 
@@ -83,7 +83,7 @@ test("rejects a whitespace-only sink name without executing pactl (set mute)", a
     },
     {
       name: "Error",
-      message: "Sink name cannot be empty.",
+      message: "Sink id cannot be empty.",
     },
   );
 
@@ -158,7 +158,7 @@ test("rejects a whitespace-only sink name without executing pactl (set volume)",
     },
     {
       name: "Error",
-      message: "Sink name cannot be empty.",
+      message: "Sink id cannot be empty.",
     },
   );
 

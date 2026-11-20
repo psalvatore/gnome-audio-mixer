@@ -14,8 +14,8 @@ function createTestController() {
   });
 
   const fakeControls = {
-    setSinkVolume: async (name: string, volume: number) => {
-      calls.push(`volume:${name}:${volume}`);
+    setSinkVolume: async (id: string | number, volume: number) => {
+      calls.push(`volume:${id}:${volume}`);
     },
     setSinkMute: async (name: string, muted: boolean) => {
       calls.push(`mute:${name}:${muted}`);

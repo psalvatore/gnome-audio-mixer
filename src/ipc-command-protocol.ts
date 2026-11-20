@@ -18,9 +18,36 @@ export function parseAudioCommand(input: string): AudioCommand | null {
     return null;
   }
 
-  return {
-    type: "set-sink-volume",
-    sinkIndex: parsed.sinkIndex,
-    volume: parsed.volume,
-  };
+  switch (parsed.type) {
+    case "set-sink-volume":
+      return {
+        type: parsed.type,
+        sinkIndex: parsed.sinkIndex,
+        volume: parsed.volume,
+      };
+
+    case "set-sink-mute":
+      return {
+        type: parsed.type,
+        sinkIndex: parsed.sinkIndex,
+        muted: parsed.muted,
+      };
+
+    case "set-sink-input-volume":
+      return {
+        type: parsed.type,
+        sinkIndex: parsed.sinkIndex,
+        volume: parsed.volume,
+      };
+
+    case "set-sink-input-mute":
+      return {
+        type: parsed.type,
+        sinkIndex: parsed.sinkIndex,
+        muted: parsed.muted,
+      };
+
+    default:
+      return null;
+  }
 }

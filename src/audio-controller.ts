@@ -16,15 +16,15 @@ export interface AudioController {
   refresh: () => void;
   start: () => void;
   stop: () => void;
-  setSinkVolume: (name: string, volume: number) => Promise<void>;
-  setSinkMute: (name: string, muted: boolean) => Promise<void>;
+  setSinkVolume: (id: string | number, volume: number) => Promise<void>;
+  setSinkMute: (id: string | number, muted: boolean) => Promise<void>;
   setSinkInputVolume: (index: number, volume: number) => Promise<void>;
   setSinkInputMute: (index: number, muted: boolean) => Promise<void>;
 }
 
 interface AudioControls {
-  setSinkVolume: (name: string, volume: number) => Promise<void>;
-  setSinkMute: (name: string, muted: boolean) => Promise<void>;
+  setSinkVolume: (id: string | number, volume: number) => Promise<void>;
+  setSinkMute: (id: string | number, muted: boolean) => Promise<void>;
   setSinkInputVolume: (index: number, volume: number) => Promise<void>;
   setSinkInputMute: (index: number, muted: boolean) => Promise<void>;
 }
@@ -75,12 +75,12 @@ export function createAudioController(
     started = false;
   }
 
-  function setSinkVolume(name: string, volume: number): Promise<void> {
-    return controls.setSinkVolume(name, volume);
+  function setSinkVolume(id: string | number, volume: number): Promise<void> {
+    return controls.setSinkVolume(id, volume);
   }
 
-  function setSinkMute(name: string, muted: boolean): Promise<void> {
-    return controls.setSinkMute(name, muted);
+  function setSinkMute(id: string | number, muted: boolean): Promise<void> {
+    return controls.setSinkMute(id, muted);
   }
 
   function setSinkInputVolume(index: number, volume: number): Promise<void> {

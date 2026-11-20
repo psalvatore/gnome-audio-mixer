@@ -114,6 +114,14 @@ export function isValidSinkName(name: string): boolean {
   return name.trim().length > 0;
 }
 
+export function isValidSinkId(id: string | number): boolean {
+  return !(
+    (typeof id === "number" && !Number.isInteger(id)) ||
+    (typeof id === "number" && id < 0) ||
+    (typeof id === "string" && id.trim().length <= 0)
+  );
+}
+
 export function isValidMenuSelection(
   selection: string,
   itemCount: number,
@@ -169,14 +177,49 @@ export function isValidAudioMessage(value: unknown): value is AudioMessage {
 
 export function isValidAudioCommand(value: unknown): value is AudioCommand {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return (
-      "type" in value &&
-      value.type === "set-sink-volume" &&
-      "sinkIndex" in value &&
-      typeof value.sinkIndex === "number" &&
-      "volume" in value &&
-      typeof value.volume === "number"
-    );
+    if ("type" in value && value.type === "set-sink-volume") {
+      return (
+        "type" in value &&
+        value.type === "set-sink-volume" &&
+        "sinkIndex" in value &&
+        typeof value.sinkIndex === "number" &&
+        "volume" in value &&
+        typeof value.volume === "number"
+      );
+    }
+
+    if ("type" in value && value.type === "set-sink-mute") {
+      return (
+        "type" in value &&
+        value.type === "set-sink-mute" &&
+        "sinkIndex" in value &&
+        typeof value.sinkIndex === "number" &&
+        "muted" in value &&
+        typeof value.muted === "boolean"
+      );
+    }
+
+    if ("type" in value && value.type === "set-sink-input-volume") {
+      return (
+        "type" in value &&
+        value.type === "set-sink-input-volume" &&
+        "sinkIndex" in value &&
+        typeof value.sinkIndex === "number" &&
+        "volume" in value &&
+        typeof value.volume === "number"
+      );
+    }
+
+    if ("type" in value && value.type === "set-sink-input-mute") {
+      return (
+        "type" in value &&
+        value.type === "set-sink-input-mute" &&
+        "sinkIndex" in value &&
+        typeof value.sinkIndex === "number" &&
+        "muted" in value &&
+        typeof value.muted === "boolean"
+      );
+    }
   }
 
   return false;

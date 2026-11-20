@@ -2,11 +2,13 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as Slider from "resource:///org/gnome/shell/ui/slider.js";
 import St from "gi://St";
 import Gio from "gi://Gio";
 import Clutter from "gi://Clutter";
 import type { AudioState } from "../src/types.js";
 import { isValidAudioMessage } from "../src/validation.js";
+import { VOLUME_LIMIT } from "../src/config.js";
 
 export default class extends Extension {
   private _indicator: PanelMenu.Button | null = null;
@@ -222,14 +224,62 @@ export default class extends Extension {
     }
 
     for (const sink of state.sinks) {
-      const menuItem = new PopupMenu.PopupMenuItem(sink.description);
-      const volumeLabel = new St.Label({
-        text: `${sink.volume}%`,
-        y_align: Clutter.ActorAlign.CENTER,
+      const menuItem = new PopupMenu.PopupBaseMenuItem({
+        activate: false,
+        can_focus: false,
+      });
+      const container = new St.BoxLayout({
+        vertical: true,
+        x_expand: true,
+      });
+      const topRow = new St.BoxLayout({
+        x_expand: true,
+      });
+      const label = new St.Label({ text: sink.description, x_expand: true });
+
+      const muteButton = new St.Button({
+        child: new St.Icon({
+          icon_name: "audio-volume-high-symbolic",
+          style_class: "popup-menu-icon",
+          x_align: 2,
+          icon_size: 20,
+        }),
+      });
+      const muteIcon = muteButton.get_child() as St.Icon;
+
+      muteIcon.icon_name = sink.mute
+        ? "audio-volume-muted-symbolic"
+        : "audio-volume-high-symbolic";
+
+      muteButton.connect("clicked", () => {
+        console.log("mute button clicked");
+
+        this._sendCommand({
+          type: "set-sink-mute",
+          sinkIndex: sink.index,
+          muted: !sink.mute,
+        });
       });
 
-      menuItem.add_child(volumeLabel);
-      menuItem.label.x_expand = true;
+      const slider = new Slider.Slider(sink.volume / VOLUME_LIMIT);
+
+      slider.connect("notify::value", () => {
+        console.log("slider value changed");
+
+        const volume = Math.round(slider.value * VOLUME_LIMIT);
+
+        this._sendCommand({
+          type: "set-sink-volume",
+          sinkIndex: sink.index,
+          volume: volume,
+        });
+      });
+
+      topRow.add_child(label);
+      topRow.add_child(muteButton);
+      container.add_child(topRow);
+      container.add_child(slider);
+      menuItem.add_child(container);
       menu.addMenuItem(menuItem);
     }
 
@@ -249,19 +299,67 @@ export default class extends Extension {
     }
 
     for (const sinkInput of state.sinkInputs) {
+      const menuItem = new PopupMenu.PopupBaseMenuItem({
+        activate: false,
+        can_focus: false,
+      });
+      const container = new St.BoxLayout({
+        vertical: true,
+        x_expand: true,
+      });
+      const topRow = new St.BoxLayout({
+        x_expand: true,
+      });
       const name =
         !sinkInput.applicationName.trim() ||
         sinkInput.applicationName === "Unknown Application"
           ? sinkInput.mediaName || "Unknown Application"
           : sinkInput.applicationName;
-      const menuItem = new PopupMenu.PopupMenuItem(name);
-      const volumeLabel = new St.Label({
-        text: `${sinkInput.volume}%`,
-        y_align: Clutter.ActorAlign.CENTER,
+      const label = new St.Label({ text: name, x_expand: true });
+
+      const muteButton = new St.Button({
+        child: new St.Icon({
+          icon_name: "audio-volume-high-symbolic",
+          style_class: "popup-menu-icon",
+          x_align: 2,
+          icon_size: 20,
+        }),
+      });
+      const muteIcon = muteButton.get_child() as St.Icon;
+
+      muteIcon.icon_name = sinkInput.mute
+        ? "audio-volume-muted-symbolic"
+        : "audio-volume-high-symbolic";
+
+      muteButton.connect("clicked", () => {
+        console.log("mute button clicked");
+
+        this._sendCommand({
+          type: "set-sink-input-mute",
+          sinkIndex: sinkInput.index,
+          muted: !sinkInput.mute,
+        });
       });
 
-      menuItem.add_child(volumeLabel);
-      menuItem.label.x_expand = true;
+      const slider = new Slider.Slider(sinkInput.volume / VOLUME_LIMIT);
+
+      slider.connect("notify::value", () => {
+        console.log("slider value changed");
+
+        const volume = Math.round(slider.value * VOLUME_LIMIT);
+
+        this._sendCommand({
+          type: "set-sink-input-volume",
+          sinkIndex: sinkInput.index,
+          volume: volume,
+        });
+      });
+
+      topRow.add_child(label);
+      topRow.add_child(muteButton);
+      container.add_child(topRow);
+      container.add_child(slider);
+      menuItem.add_child(container);
       menu.addMenuItem(menuItem);
     }
   }

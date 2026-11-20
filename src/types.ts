@@ -97,8 +97,16 @@ export interface AudioStateChanges {
   sinkInputs: SinkInputChanges;
 }
 
-export type AudioCommand = {
-  type: "set-sink-volume";
-  sinkIndex: number;
-  volume: number;
-};
+export type AudioCommand =
+  | { type: "set-sink-volume"; sinkIndex: number; volume: number }
+  | {
+      type: "set-sink-mute";
+      sinkIndex: number;
+      muted: boolean;
+    }
+  | { type: "set-sink-input-volume"; sinkIndex: number; volume: number }
+  | {
+      type: "set-sink-input-mute";
+      sinkIndex: number;
+      muted: boolean;
+    };

@@ -11,6 +11,7 @@ import {
   isPactlSink,
   isValidVolume,
   isValidSinkName,
+  isValidSinkId,
   isPactlSinkInput,
 } from "./validation.js";
 import { VOLUME_LIMIT } from "./config.js";
@@ -51,32 +52,32 @@ export async function getSinks(
 }
 
 export async function setSinkVolume(
-  name: string,
+  id: string | number,
   volume: number,
   runner: CommandRunner = defaultRunner,
 ): Promise<void> {
-  if (!isValidSinkName(name)) {
-    throw new Error("Sink name cannot be empty.");
+  if (!isValidSinkId(id)) {
+    throw new Error("Sink id cannot be empty.");
   }
 
   if (!isValidVolume(volume)) {
     throw new RangeError(`Volume must be between 0 and ${VOLUME_LIMIT}.`);
   }
 
-  await runner("pactl", ["set-sink-volume", name, `${volume}%`]);
+  await runner("pactl", ["set-sink-volume", `${id}`, `${volume}%`]);
 }
 
 export async function setSinkMute(
-  name: string,
+  id: string | number,
   muted: boolean,
   runner: CommandRunner = defaultRunner,
 ): Promise<void> {
-  if (!isValidSinkName(name)) {
-    throw new Error("Sink name cannot be empty.");
+  if (!isValidSinkId(id)) {
+    throw new Error("Sink id cannot be empty.");
   }
 
   const muteValue = muted ? "1" : "0";
-  await runner("pactl", ["set-sink-mute", name, muteValue]);
+  await runner("pactl", ["set-sink-mute", `${id}`, muteValue]);
 }
 
 function getMaxVolumeFromChannels(value: PactlVolumeProp): number {
