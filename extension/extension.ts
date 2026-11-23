@@ -6,9 +6,21 @@ import * as Slider from "resource:///org/gnome/shell/ui/slider.js";
 import St from "gi://St";
 import Gio from "gi://Gio";
 import Clutter from "gi://Clutter";
-import type { AudioState } from "../src/types.js";
-import { isValidAudioMessage } from "../src/validation.js";
+import type { AudioSink, AudioSinkInput, AudioState } from "../src/types.js";
+import {
+  isValidAudioMessage,
+  isAudioSink,
+  isAudioSinkInput,
+} from "../src/validation.js";
+import { getSinkChanges, getSinkInputChanges } from "../src/audio-diff.js";
 import { VOLUME_LIMIT } from "../src/config.js";
+
+type AudioMenuItem = {
+  menuItem: PopupMenu.PopupBaseMenuItem;
+  slider: Slider.Slider;
+  muteIcon: St.Icon;
+  sliderHandlerId: number;
+};
 
 export default class extends Extension {
   private _indicator: PanelMenu.Button | null = null;
@@ -18,6 +30,11 @@ export default class extends Extension {
   private _commandQueue: Uint8Array[] = [];
   private _isWriting = false;
   private _sessionId = 0;
+  private _audioMenuItems = new Map<string, AudioMenuItem>();
+  private _outputDevicesSection: PopupMenu.PopupMenuSection | null = null;
+  private _applicationsSection: PopupMenu.PopupMenuSection | null = null;
+  private _noDevicesItem: PopupMenu.PopupMenuItem | null = null;
+  private _noApplicationsItem: PopupMenu.PopupMenuItem | null = null;
 
   enable() {
     this._sessionId++;
@@ -47,6 +64,11 @@ export default class extends Extension {
     this._subprocess?.send_signal(2);
     this._subprocess = null;
     this._state = null;
+    this._audioMenuItems.clear();
+    this._outputDevicesSection = null;
+    this._applicationsSection = null;
+    this._noDevicesItem = null;
+    this._noApplicationsItem = null;
   }
 
   private _startBackend(): void {
@@ -191,9 +213,84 @@ export default class extends Extension {
     if (isValidAudioMessage(message)) {
       switch (message.type) {
         case "state":
-          this._state = message.payload;
-          this._renderMenu(this._state);
-          console.log("Audio IPC state updated:", JSON.stringify(message));
+          if (!this._state) {
+            this._state = message.payload;
+            this._initMenu(this._state);
+
+            console.log("GNOME Audio Mixer: initialized menu.");
+          } else {
+            const sinkChanges = getSinkChanges(
+              this._state.sinks,
+              message.payload.sinks,
+            );
+
+            if (sinkChanges.updated.length > 0) {
+              for (const updatedSink of sinkChanges.updated) {
+                this._renderMenuItem(updatedSink);
+
+                console.log(
+                  `GNOME Audio Mixer: updated sink ${updatedSink.index}`,
+                );
+              }
+            }
+
+            if (sinkChanges.added.length > 0) {
+              for (const addedSink of sinkChanges.added) {
+                this._renderMenuItem(addedSink);
+
+                console.log(`GNOME Audio Mixer: added sink ${addedSink.index}`);
+              }
+            }
+
+            if (sinkChanges.removed.length > 0) {
+              for (const removedSink of sinkChanges.removed) {
+                this._destroyMenuItem(removedSink);
+
+                console.log(
+                  `GNOME Audio Mixer: removed sink ${removedSink.index}`,
+                );
+              }
+            }
+
+            const sinkInputChanges = getSinkInputChanges(
+              this._state.sinkInputs,
+              message.payload.sinkInputs,
+            );
+
+            if (sinkInputChanges.updated.length > 0) {
+              for (const updatedSinkInput of sinkInputChanges.updated) {
+                this._renderMenuItem(updatedSinkInput);
+
+                console.log(
+                  `GNOME Audio Mixer: updated sink ${updatedSinkInput.index}`,
+                );
+              }
+            }
+
+            if (sinkInputChanges.added.length > 0) {
+              for (const addedSinkInput of sinkInputChanges.added) {
+                this._renderMenuItem(addedSinkInput);
+
+                console.log(
+                  `GNOME Audio Mixer: added sink ${addedSinkInput.index}`,
+                );
+              }
+            }
+
+            if (sinkInputChanges.removed.length > 0) {
+              for (const removedSinkInput of sinkInputChanges.removed) {
+                this._destroyMenuItem(removedSinkInput);
+
+                console.log(
+                  `GNOME Audio Mixer: removed sink ${removedSinkInput.index}`,
+                );
+              }
+            }
+
+            this._state = message.payload;
+            this._updateEmptyStates(this._state);
+          }
+
           break;
         default:
           break;
@@ -203,164 +300,230 @@ export default class extends Extension {
     }
   }
 
-  private _renderMenu(state: AudioState): void {
+  private _renderMenuItem(audioStream: AudioSink | AudioSinkInput): void {
+    const mapKey = this._getMapKey(audioStream);
+
+    if (this._audioMenuItems.get(mapKey) === undefined) {
+      this._initMenuItem(audioStream);
+    } else {
+      this._updateMenuItem(audioStream);
+    }
+  }
+
+  private _initMenu(state: AudioState): void {
     if (!this._indicator) return;
 
     const menu = this._indicator.menu as PopupMenu.PopupMenu;
 
-    menu.removeAll();
-
+    // Output Devices
     const outputDevicesHeader = new PopupMenu.PopupSeparatorMenuItem(
       "Output Devices",
     );
 
-    menu.addMenuItem(outputDevicesHeader);
+    this._outputDevicesSection = new PopupMenu.PopupMenuSection();
+    this._outputDevicesSection.addMenuItem(outputDevicesHeader);
+    this._noDevicesItem = new PopupMenu.PopupMenuItem(
+      "No output devices found",
+    );
+    this._noDevicesItem.sensitive = false;
+    this._outputDevicesSection.addMenuItem(this._noDevicesItem);
 
-    if (state.sinks.length === 0) {
-      const menuItem = new PopupMenu.PopupMenuItem("No output devices found");
-
-      menuItem.sensitive = false;
-      menu.addMenuItem(menuItem);
-    }
+    menu.addMenuItem(this._outputDevicesSection);
 
     for (const sink of state.sinks) {
-      const menuItem = new PopupMenu.PopupBaseMenuItem({
-        activate: false,
-        can_focus: false,
-      });
-      const container = new St.BoxLayout({
-        vertical: true,
-        x_expand: true,
-      });
-      const topRow = new St.BoxLayout({
-        x_expand: true,
-      });
-      const label = new St.Label({ text: sink.description, x_expand: true });
-
-      const muteButton = new St.Button({
-        child: new St.Icon({
-          icon_name: "audio-volume-high-symbolic",
-          style_class: "popup-menu-icon",
-          x_align: 2,
-          icon_size: 20,
-        }),
-      });
-      const muteIcon = muteButton.get_child() as St.Icon;
-
-      muteIcon.icon_name = sink.mute
-        ? "audio-volume-muted-symbolic"
-        : "audio-volume-high-symbolic";
-
-      muteButton.connect("clicked", () => {
-        console.log("mute button clicked");
-
-        this._sendCommand({
-          type: "set-sink-mute",
-          sinkIndex: sink.index,
-          muted: !sink.mute,
-        });
-      });
-
-      const slider = new Slider.Slider(sink.volume / VOLUME_LIMIT);
-
-      slider.connect("notify::value", () => {
-        console.log("slider value changed");
-
-        const volume = Math.round(slider.value * VOLUME_LIMIT);
-
-        this._sendCommand({
-          type: "set-sink-volume",
-          sinkIndex: sink.index,
-          volume: volume,
-        });
-      });
-
-      topRow.add_child(label);
-      topRow.add_child(muteButton);
-      container.add_child(topRow);
-      container.add_child(slider);
-      menuItem.add_child(container);
-      menu.addMenuItem(menuItem);
+      this._renderMenuItem(sink);
     }
 
+    // Applications
     const applicationsHeader = new PopupMenu.PopupSeparatorMenuItem(
       "Applications",
     );
 
-    menu.addMenuItem(applicationsHeader);
+    this._applicationsSection = new PopupMenu.PopupMenuSection();
+    this._applicationsSection.addMenuItem(applicationsHeader);
+    this._noApplicationsItem = new PopupMenu.PopupMenuItem(
+      "No active application streams",
+    );
+    this._noApplicationsItem.sensitive = false;
+    this._applicationsSection.addMenuItem(this._noApplicationsItem);
 
-    if (state.sinkInputs.length === 0) {
-      const menuItem = new PopupMenu.PopupMenuItem(
-        "No active application streams",
-      );
-
-      menuItem.sensitive = false;
-      menu.addMenuItem(menuItem);
-    }
+    menu.addMenuItem(this._applicationsSection);
 
     for (const sinkInput of state.sinkInputs) {
-      const menuItem = new PopupMenu.PopupBaseMenuItem({
-        activate: false,
-        can_focus: false,
+      this._renderMenuItem(sinkInput);
+    }
+
+    this._updateEmptyStates(state);
+  }
+
+  private _initMenuItem(audioStream: AudioSink | AudioSinkInput): void {
+    const menuItem = new PopupMenu.PopupBaseMenuItem({
+      activate: false,
+      can_focus: false,
+    });
+    const container = new St.BoxLayout({
+      vertical: true,
+      x_expand: true,
+    });
+    const topRow = new St.BoxLayout({
+      x_expand: true,
+    });
+    const itemLabel = new St.Label({ text: "", x_expand: true });
+    const slider = new Slider.Slider(audioStream.volume / VOLUME_LIMIT);
+    const muteButton = new St.Button({
+      child: new St.Icon({
+        icon_name: "audio-volume-high-symbolic",
+        style_class: "popup-menu-icon",
+        x_align: 2,
+        icon_size: 20,
+      }),
+    });
+    const muteIcon = muteButton.get_child() as St.Icon;
+
+    let audioStreamName = "";
+    let volumeCommand = "";
+    let muteCommand = "";
+    let sinkType = "";
+
+    if (isAudioSink(audioStream)) {
+      audioStreamName = audioStream.description;
+      volumeCommand = "set-sink-volume";
+      muteCommand = "set-sink-mute";
+      sinkType = "sink";
+    }
+
+    if (isAudioSinkInput(audioStream)) {
+      audioStreamName =
+        !audioStream.applicationName.trim() ||
+        audioStream.applicationName === "Unknown Application"
+          ? audioStream.mediaName || "Unknown Application"
+          : audioStream.applicationName;
+      volumeCommand = "set-sink-input-volume";
+      muteCommand = "set-sink-input-mute";
+      sinkType = "sinkInput";
+    }
+
+    const sliderHandlerId = slider.connect("notify::value", () => {
+      console.log("slider value changed");
+
+      this._sendCommand({
+        type: volumeCommand,
+        sinkIndex: audioStream.index,
+        volume: Math.round(slider.value * VOLUME_LIMIT),
       });
-      const container = new St.BoxLayout({
-        vertical: true,
-        x_expand: true,
+    });
+
+    muteIcon.icon_name = audioStream.mute
+      ? "audio-volume-muted-symbolic"
+      : "audio-volume-high-symbolic";
+
+    muteButton.connect("clicked", () => {
+      console.log("mute button clicked");
+
+      const currentStream = this._getCurrentAudioStreamById(
+        sinkType,
+        audioStream.index,
+      );
+
+      if (!currentStream) return;
+
+      this._sendCommand({
+        type: muteCommand,
+        sinkIndex: currentStream.index,
+        muted: !currentStream.mute,
       });
-      const topRow = new St.BoxLayout({
-        x_expand: true,
-      });
-      const name =
-        !sinkInput.applicationName.trim() ||
-        sinkInput.applicationName === "Unknown Application"
-          ? sinkInput.mediaName || "Unknown Application"
-          : sinkInput.applicationName;
-      const label = new St.Label({ text: name, x_expand: true });
+    });
 
-      const muteButton = new St.Button({
-        child: new St.Icon({
-          icon_name: "audio-volume-high-symbolic",
-          style_class: "popup-menu-icon",
-          x_align: 2,
-          icon_size: 20,
-        }),
-      });
-      const muteIcon = muteButton.get_child() as St.Icon;
+    itemLabel.set_text(audioStreamName);
+    topRow.add_child(itemLabel);
+    topRow.add_child(muteButton);
+    container.add_child(topRow);
+    container.add_child(slider);
+    menuItem.add_child(container);
 
-      muteIcon.icon_name = sinkInput.mute
-        ? "audio-volume-muted-symbolic"
-        : "audio-volume-high-symbolic";
+    if (sinkType === "sink" && this._outputDevicesSection) {
+      this._outputDevicesSection.addMenuItem(menuItem);
+    }
 
-      muteButton.connect("clicked", () => {
-        console.log("mute button clicked");
+    if (sinkType === "sinkInput" && this._applicationsSection) {
+      this._applicationsSection.addMenuItem(menuItem);
+    }
 
-        this._sendCommand({
-          type: "set-sink-input-mute",
-          sinkIndex: sinkInput.index,
-          muted: !sinkInput.mute,
-        });
-      });
+    const mapKey = this._getMapKey(audioStream);
+    this._audioMenuItems.set(mapKey, {
+      menuItem,
+      slider,
+      muteIcon,
+      sliderHandlerId,
+    });
+  }
 
-      const slider = new Slider.Slider(sinkInput.volume / VOLUME_LIMIT);
+  private _updateMenuItem(audioStream: AudioSink | AudioSinkInput): void {
+    const mapKey = this._getMapKey(audioStream);
+    const audioMenuItem = this._audioMenuItems.get(mapKey);
 
-      slider.connect("notify::value", () => {
-        console.log("slider value changed");
+    if (!audioMenuItem) return;
 
-        const volume = Math.round(slider.value * VOLUME_LIMIT);
+    audioMenuItem.slider.block_signal_handler(audioMenuItem.sliderHandlerId);
 
-        this._sendCommand({
-          type: "set-sink-input-volume",
-          sinkIndex: sinkInput.index,
-          volume: volume,
-        });
-      });
+    try {
+      audioMenuItem.slider.value = audioStream.volume / VOLUME_LIMIT;
+    } finally {
+      audioMenuItem.slider.unblock_signal_handler(
+        audioMenuItem.sliderHandlerId,
+      );
+    }
 
-      topRow.add_child(label);
-      topRow.add_child(muteButton);
-      container.add_child(topRow);
-      container.add_child(slider);
-      menuItem.add_child(container);
-      menu.addMenuItem(menuItem);
+    audioMenuItem.muteIcon.icon_name = audioStream.mute
+      ? "audio-volume-muted-symbolic"
+      : "audio-volume-high-symbolic";
+  }
+
+  private _destroyMenuItem(audioStream: AudioSink | AudioSinkInput): void {
+    const mapKey = this._getMapKey(audioStream);
+    const audioMenuItem = this._audioMenuItems.get(mapKey);
+
+    if (!audioMenuItem) return;
+
+    audioMenuItem.menuItem.destroy();
+    this._audioMenuItems.delete(mapKey);
+  }
+
+  private _getCurrentAudioStreamById(
+    sinkType: string,
+    index: number,
+  ): AudioSink | AudioSinkInput | null {
+    let audioStream = null;
+
+    if (this._state) {
+      switch (sinkType) {
+        case "sink":
+          audioStream = this._state.sinks.find((sink) => sink.index === index);
+          break;
+        case "sinkInput":
+          audioStream = this._state.sinkInputs.find(
+            (sinkInput) => sinkInput.index === index,
+          );
+          break;
+      }
+    }
+
+    return audioStream ?? null;
+  }
+
+  private _getMapKey(audioStream: AudioSink | AudioSinkInput): string {
+    return isAudioSink(audioStream)
+      ? `sink-${audioStream.index}`
+      : `sink-input-${audioStream.index}`;
+  }
+
+  private _updateEmptyStates(state: AudioState): void {
+    if (this._noDevicesItem) {
+      this._noDevicesItem.visible = state.sinks.length === 0;
+    }
+
+    if (this._noApplicationsItem) {
+      this._noApplicationsItem.visible = state.sinkInputs.length === 0;
     }
   }
 }
