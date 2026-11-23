@@ -14,6 +14,7 @@
   },
   "include": [
     "extension.ts",
+    "audio-menu.ts",
     "../node_modules/@girs/gnome-shell/dist/extensions/extension-ambient.d.ts",
     "../node_modules/@girs/gnome-shell/dist/ui/panelMenu-ambient.d.ts",
     "../node_modules/@girs/gnome-shell/dist/ui/popupMenu-ambient.d.ts",
