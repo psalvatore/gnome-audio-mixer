@@ -3,8 +3,8 @@ import test from "node:test";
 import {
   serializeAudioMessage,
   parseAudioMessage,
-  type AudioMessage,
 } from "../src/ipc-protocol.js";
+import type { AudioMessage } from "../src/types.js";
 
 const message: AudioMessage = {
   type: "state",

@@ -10,7 +10,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:types": "tsc --project tests/tsconfig.json",
     "build:extension": "tsc --project extension/tsconfig.json --noEmit && node scripts/build-extension.mjs",
-    "deploy:extension": "npm run build:extension && mkdir -p \"$HOME/.local/share/gnome-shell/extensions/gnome-audio-mixer@psalvatore\" && cp dist-extension/* \"$HOME/.local/share/gnome-shell/extensions/gnome-audio-mixer@psalvatore/\""
+    "package:backend": "mkdir -p dist-extension/backend && cp -R dist/. dist-extension/backend/ && printf '{\"type\":\"module\"}\\n' > dist-extension/backend/package.json",
+    "deploy:extension": "npm run build && npm run build:extension && npm run package:backend && mkdir -p \"$HOME/.local/share/gnome-shell/extensions/gnome-audio-mixer@psalvatore\" && cp -R dist-extension/. \"$HOME/.local/share/gnome-shell/extensions/gnome-audio-mixer@psalvatore/\""
   },
   "keywords": [],
   "author": "",

@@ -22,7 +22,7 @@ export default class extends Extension {
     this._indicator.add_child(icon);
     Main.panel.addToStatusArea(this.uuid, this._indicator);
 
-    this._ipc = new AudioIpcClient((message) => {
+    this._ipc = new AudioIpcClient(this.path, (message) => {
       this._handleMessage(message);
     });
 

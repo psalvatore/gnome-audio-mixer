@@ -1,4 +1,5 @@
 import Gio from "gi://Gio";
+import GLib from "gi://GLib";
 
 export class AudioIpcClient {
   private _sessionId = 0;
@@ -6,34 +7,26 @@ export class AudioIpcClient {
   private _cancellable: Gio.Cancellable | null = null;
   private _commandQueue: Uint8Array[] = [];
   private _isWriting = false;
+  private _restartSourceId: number | null = null;
+  private _consecutiveRestarts: number = 0;
+  private _healthSourceId: number | null = null;
 
-  constructor(private readonly onMessage: (message: unknown) => void) {}
+  constructor(
+    private readonly extensionPath: string,
+    private readonly onMessage: (message: unknown) => void,
+  ) {}
 
   startBackend(): void {
-    this._sessionId++;
-    this._subprocess = Gio.Subprocess.new(
-      [
-        "/home/pat/.nvm/versions/node/v24.21.0/bin/node",
-        "/home/pat/Development/Projects/gnome-audio-mixer/dist/ipc-server.js",
-      ],
-      Gio.SubprocessFlags.STDOUT_PIPE |
-        Gio.SubprocessFlags.STDIN_PIPE |
-        Gio.SubprocessFlags.STDERR_PIPE,
-    );
-    this._cancellable = new Gio.Cancellable();
+    if (this._subprocess !== null) return;
 
-    this.startReadingBackendErrors();
-    this.startReadingBackendOutput();
-  }
-
-  cleanupBackend(): void {
-    this._sessionId++;
-    this._cancellable?.cancel();
-    this._cancellable = null;
-    this._commandQueue = [];
-    this._isWriting = false;
-    this._subprocess?.send_signal(2);
-    this._subprocess = null;
+    try {
+      this._launchBackend();
+      this._startMonitoring();
+      this._startHealthTimer();
+    } catch (error) {
+      this.cleanupBackend();
+      this._handleStartupFailure(error);
+    }
   }
 
   readNextLine(
@@ -113,7 +106,112 @@ export class AudioIpcClient {
     this.processCommandQueue();
   }
 
-  startReadingBackendErrors(): void {
+  cleanupBackend(): void {
+    this._sessionId++;
+    this._cancellable?.cancel();
+    this._cancellable = null;
+    this._commandQueue = [];
+    this._isWriting = false;
+    this._subprocess?.send_signal(2);
+    this._subprocess = null;
+
+    if (this._restartSourceId !== null) {
+      GLib.Source.remove(this._restartSourceId);
+      this._restartSourceId = null;
+    }
+
+    if (this._healthSourceId !== null) {
+      GLib.Source.remove(this._healthSourceId);
+      this._healthSourceId = null;
+    }
+  }
+
+  private _launchBackend(): void {
+    this._sessionId++;
+
+    const nodePath = GLib.find_program_in_path("node");
+
+    if (!nodePath) {
+      throw new Error("Node.js executable not found in PATH");
+    }
+
+    const backendPath = GLib.build_filenamev([
+      this.extensionPath,
+      "backend",
+      "ipc-server.js",
+    ]);
+
+    this._subprocess = Gio.Subprocess.new(
+      [nodePath, backendPath],
+      Gio.SubprocessFlags.STDOUT_PIPE |
+        Gio.SubprocessFlags.STDIN_PIPE |
+        Gio.SubprocessFlags.STDERR_PIPE,
+    );
+
+    this._cancellable = new Gio.Cancellable();
+
+    this._startReadingBackendErrors();
+    this._startReadingBackendOutput();
+  }
+
+  private _startMonitoring(): void {
+    const subprocess = this._subprocess;
+    const sessionId = this._sessionId;
+
+    if (subprocess) {
+      subprocess.wait_async(null, (_source, result) => {
+        try {
+          subprocess.wait_finish(result);
+        } catch (error) {
+          if (sessionId === this._sessionId) {
+            console.error("Failed to wait for audio backend:", error);
+          }
+          return;
+        }
+
+        // Ignore termination events from a stopped or previous session.
+        if (sessionId !== this._sessionId) return;
+
+        // Prevent edge case where crash and restart timing circumvent exponential backoff
+        if (this._healthSourceId !== null) {
+          GLib.Source.remove(this._healthSourceId);
+          this._healthSourceId = null;
+        }
+
+        if (subprocess.get_if_exited()) {
+          console.error(
+            `Audio backend exited unexpectedly (code: ${subprocess.get_exit_status()})`,
+          );
+        } else if (subprocess.get_if_signaled()) {
+          console.error(
+            `Audio backend terminated by signal ${subprocess.get_term_sig()}`,
+          );
+        }
+
+        if (this._consecutiveRestarts >= 5) {
+          console.error("Too many failed consecutive restart attempts");
+          return;
+        }
+
+        this._scheduleRestart();
+      });
+    }
+  }
+
+  private _handleStartupFailure(error: unknown): void {
+    console.error("Audio Backend failed to launch:", error);
+
+    if (this._consecutiveRestarts >= 5) {
+      console.error(
+        "Too many failed consecutive restart attempts. Manually disable and re-enable extension to try again.",
+      );
+      return;
+    }
+
+    this._scheduleRestart();
+  }
+
+  private _startReadingBackendErrors(): void {
     const cancellable = this._cancellable;
     const stderr = this._subprocess?.get_stderr_pipe();
 
@@ -144,7 +242,7 @@ export class AudioIpcClient {
     }
   }
 
-  startReadingBackendOutput(): void {
+  private _startReadingBackendOutput(): void {
     const inputStream = this._subprocess?.get_stdout_pipe();
 
     if (!(inputStream instanceof Gio.InputStream)) {
@@ -158,5 +256,53 @@ export class AudioIpcClient {
     }
 
     this.readNextLine(dataInputStream, this._cancellable);
+  }
+
+  private _scheduleRestart(): void {
+    if (this._restartSourceId !== null) return;
+
+    this._consecutiveRestarts++;
+
+    const sessionId = this._sessionId;
+    const timeout = 1000 * 2 ** (this._consecutiveRestarts - 1);
+
+    this._restartSourceId = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      timeout,
+      () => {
+        this._restartSourceId = null;
+
+        if (sessionId !== this._sessionId) {
+          return GLib.SOURCE_REMOVE;
+        }
+
+        this.cleanupBackend();
+        this.startBackend();
+
+        return GLib.SOURCE_REMOVE;
+      },
+    );
+  }
+
+  private _startHealthTimer(): void {
+    if (this._healthSourceId !== null) return;
+
+    const sessionId = this._sessionId;
+
+    this._healthSourceId = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      30000,
+      () => {
+        this._healthSourceId = null;
+
+        if (sessionId !== this._sessionId) {
+          return GLib.SOURCE_REMOVE;
+        }
+
+        this._consecutiveRestarts = 0;
+
+        return GLib.SOURCE_REMOVE;
+      },
+    );
   }
 }

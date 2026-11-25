@@ -17,7 +17,7 @@ function createTestController() {
     setSinkVolume: async (id: string | number, volume: number) => {
       calls.push(`volume:${id}:${volume}`);
     },
-    setSinkMute: async (name: string, muted: boolean) => {
+    setSinkMute: async (name: string | number, muted: boolean) => {
       calls.push(`mute:${name}:${muted}`);
     },
     setSinkInputVolume: async (index: number, volume: number) => {
@@ -189,7 +189,7 @@ test("controller propagates audio control errors", async () => {
     setSinkVolume: async () => {
       throw new Error("pactl failed");
     },
-    setSinkMute: async (name: string, muted: boolean) => {
+    setSinkMute: async (name: string | number, muted: boolean) => {
       calls.push(`mute:${name}:${muted}`);
     },
     setSinkInputVolume: async (index: number, volume: number) => {

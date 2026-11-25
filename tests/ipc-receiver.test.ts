@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createIpcReceiver } from "../src/ipc-receiver.js";
-import {
-  serializeAudioMessage,
-  type AudioMessage,
-} from "../src/ipc-protocol.js";
+import { serializeAudioMessage } from "../src/ipc-protocol.js";
+import type { AudioMessage } from "../src/types.js";
 
 test("Receives a complete message in one chunk", () => {
   const receivedMessages: AudioMessage[] = [];
