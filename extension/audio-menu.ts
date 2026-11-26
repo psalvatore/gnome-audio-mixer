@@ -6,7 +6,7 @@ import { VOLUME_LIMIT } from "../src/config.js";
 import { isAudioSink, isAudioSinkInput } from "../src/validation.js";
 
 type AudioMenuItem = {
-  menuItem: PopupMenu.PopupBaseMenuItem;
+  menuItem: PopupMenu.PopupMenuSection;
   slider: Slider.Slider;
   muteIcon: St.Icon;
   sliderHandlerId: number;
@@ -80,15 +80,17 @@ export class AudioMenu {
   }
 
   initMenuItem(audioStream: AudioSink | AudioSinkInput): void {
-    const menuItem = new PopupMenu.PopupBaseMenuItem({
-      activate: false,
-      can_focus: false,
-    });
+    const menuItem = new PopupMenu.PopupMenuSection();
     const container = new St.BoxLayout({
       vertical: true,
       x_expand: true,
+      style: "padding: 6px 12px;",
     });
     const topRow = new St.BoxLayout({
+      x_expand: true,
+      style: "padding: 0px 0px 5px 0px;",
+    });
+    const bottomRow = new St.BoxLayout({
       x_expand: true,
     });
     const itemLabel = new St.Label({ text: "", x_expand: true });
@@ -97,8 +99,8 @@ export class AudioMenu {
       child: new St.Icon({
         icon_name: "audio-volume-high-symbolic",
         style_class: "popup-menu-icon",
-        x_align: 2,
-        icon_size: 20,
+        x_align: 1,
+        icon_size: 15,
       }),
     });
     const muteIcon = muteButton.get_child() as St.Icon;
@@ -159,10 +161,12 @@ export class AudioMenu {
 
     itemLabel.set_text(audioStreamName);
     topRow.add_child(itemLabel);
-    topRow.add_child(muteButton);
+    bottomRow.add_child(muteButton);
+    bottomRow.add_child(new St.Widget({ width: 12 }));
+    bottomRow.add_child(slider);
     container.add_child(topRow);
-    container.add_child(slider);
-    menuItem.add_child(container);
+    container.add_child(bottomRow);
+    menuItem.box.add_child(container);
 
     if (sinkType === "sink" && this._outputDevicesSection) {
       this._outputDevicesSection.addMenuItem(menuItem);
